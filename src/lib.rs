@@ -1,7 +1,7 @@
-use std::{fmt::{self, Display}, io::LineWriter};
+use std::fmt::{self, Display};
+use rand::{rng, Rng};
 
-use rand::{rng, rngs::ThreadRng, Rng};
-
+#[derive(Clone)]
 pub struct Grammar{
     pub terminals: Vec<Symbol>,
     pub nonterminals: Vec<Symbol>,
@@ -69,29 +69,6 @@ impl Grammar {
                     }
                 }
             }
-
-
-            // let num_symbols = rng.random_range(1..=4); 
-            // let mut has_nonterminal = rng.random_bool(0.5);   
-            // let mut empty_line = rng.random_bool(0.25);
-        
-            // for i in 0..num_symbols {
-            //     if empty_line{
-            //         let symbol = Symbol{liter:238 as u8 as char, symbol_type:SymbolType::EmptyLine};
-            //         right.add_symbol(symbol);
-            //     }
-            //     if  has_nonterminal && i == rng.random_range(1..=num_symbols) {
-            //         let random_nonterminal_index = rng.random_range(0..nonterminals.len());
-            //         let symbol = nonterminals[random_nonterminal_index].clone();
-            //         right.add_symbol(symbol);
-            //         has_nonterminal = false;
-            //     } else {
-            //         let random_terminal_index = rng.random_range(0..terminals.len());
-            //         let symbol = terminals[random_terminal_index].clone();
-            //         right.add_symbol(symbol);
-            //     }
-            // }
-        
             let rule = Rule { left, right };
             rules.push(rule);
         }
