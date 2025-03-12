@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "TAiFYa_types"
+version = "0.1.0"
+dependencies = [
+ "rand",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -104,13 +111,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "types_TAiFYa"
-version = "0.1.0"
-dependencies = [
- "rand",
 ]
 
 [[package]]

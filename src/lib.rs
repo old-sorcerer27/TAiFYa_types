@@ -1,12 +1,12 @@
 use std::{fmt::{self, Display}, io::LineWriter};
 
-use rand::{rng, Rng};
+use rand::{rng, rngs::ThreadRng, Rng};
 
 pub struct Grammar{
-    pub(crate) terminals: Vec<Symbol>,
-    pub(crate) nonterminals: Vec<Symbol>,
-    pub(crate) rules: Vec<Rule>,
-    pub(crate) initial_state: Symbol
+    pub terminals: Vec<Symbol>,
+    pub nonterminals: Vec<Symbol>,
+    pub rules: Vec<Rule>,
+    pub initial_state: Symbol
 }
 
 impl fmt::Debug for Grammar {
@@ -36,12 +36,12 @@ impl Grammar {
         let mut rules = Vec::with_capacity(rules_count as usize);
 
         for _ in 0..terminals_count {
-            let terminal = Symbol::new(rng.random_range(97..122) as u8 as char, Type::Terminal);
+            let terminal = Symbol::new(rng.random_range(97..122) as u8 as char,SymbolType::Terminal);
             terminals.push(terminal);
         }
 
         for _ in 0..nonterminals_count {
-            let nonterminal = Symbol::new(rng.random_range(65..90) as u8 as char, Type::Nonterminal);
+            let nonterminal = Symbol::new(rng.random_range(65..90) as u8 as char,SymbolType::Nonterminal);
             nonterminals.push(nonterminal);
         }
 
@@ -51,7 +51,7 @@ impl Grammar {
             let empty_line = rng.random_bool(0.25);
 
             if empty_line{
-                let symbol = Symbol{liter: 'ε', symbol_type: Type::EmptyLine};
+                let symbol = Symbol{liter: 'ε', symbol_type:SymbolType::EmptyLine};
                 right.add_symbol(symbol);
             } else {
                 let num_symbols = rng.random_range(1..=4); 
@@ -77,7 +77,7 @@ impl Grammar {
         
             // for i in 0..num_symbols {
             //     if empty_line{
-            //         let symbol = Symbol{liter:238 as u8 as char, symbol_type: Type::EmptyLine};
+            //         let symbol = Symbol{liter:238 as u8 as char, symbol_type:SymbolType::EmptyLine};
             //         right.add_symbol(symbol);
             //     }
             //     if  has_nonterminal && i == rng.random_range(1..=num_symbols) {
@@ -126,60 +126,77 @@ impl Grammar {
     
 
 
-    pub fn generate_line (&self) -> (Vec<Chain>, String) {
+    pub fn generate_line (&self) -> (Vec<Chain>, Vec<Rule>, String) {
         let mut cur_noterm = self.initial_state.clone();
         let mut chains = Vec::from(Chain::new(cur_noterm.clone()));
         let mut chain_string  = cur_noterm.to_string();
-        
-        
-        for  _i in 0..6  {
-            match self.get_nonterminals_rule(&cur_noterm) {
-                Ok(r) => {
-                    chains.push(r.gen_chain(chains[chains.len() - 1].clone()));
-                    chain_string.push_str(&format!(" -> {}", chains[chains.len() - 1].clone().to_string()));
-                    match r.right.get_nonterminal() {
-                        Ok(nt) => {
-                            if nt.0.liter == cur_noterm.liter {
-                                break;
-                            } else {
+        let mut rules=  vec![Rule {
+            left: self.initial_state.clone(), 
+            right: Chain::new(self.initial_state.clone())
+        }];
+       
+        for  _i in 0..10 {
+                match self.get_random_nonterminal_rule(&cur_noterm) {
+                    Ok(r) => {
+                        chains.push(r.gen_chain(chains[chains.len() - 1].clone()));
+                        rules.push(r.clone());
+                        chain_string.push_str(&format!(" -> {}", chains[chains.len() - 1].clone().to_string()));
+                        match r.right.get_nonterminal() {
+                            Ok(nt) => {
                                 cur_noterm = nt.0;
                             }
+                            Err(_) => {
+                                break;
+                            },
                         }
-                        Err(_) => {
-                            break;
-                        },
-                    }
-                },
-                Err(_) => {
-                    break;
-                },
+                    },
+                    Err(_) => {
+                        break;
+                    },
+                }
             }
-        }
         
-        return (chains, chain_string);
+        return (chains, rules, chain_string);
     }
 
-  
-
-    pub fn get_nonterminals_rule (&self, nt:&Symbol) -> Result<Rule, TypesError>{
-        for r in &self.rules {
-            if r.left.liter == nt.liter {
-                return Ok(r.clone());
-            }
-        }
-        return Err(TypesError::RightError);
-    }
     
-
-    fn get_nonterminals_rules (&self, nt:&Symbol) -> Result<Vec<Rule>, TypesError>{
+    pub fn get_random_nonterminal_rule (&self, nt:&Symbol ) -> Result<Rule, SymbolTypesError>{
+        let mut rng = rng();
         let mut rules:Vec<Rule> = vec![];
         for r in &self.rules {
             if r.left.liter == nt.liter {
                 rules.push(r.clone());
             }
-            return Ok(rules);
         }
-        return Err(TypesError::RightError);
+        if rules.len() > 0 {
+            return Ok(rules[rng.random_range(0..rules.len())].clone()); 
+        } else {
+            return Err(SymbolTypesError::RightError);
+        }
+    }
+
+    pub fn get_nonterminal_rule (&self, nt:&Symbol) -> Result<Rule, SymbolTypesError>{
+        for r in &self.rules {
+            if r.left.liter == nt.liter {
+                return Ok(r.clone());
+            }
+        }
+        return Err(SymbolTypesError::RightError);
+    }
+    
+
+    pub fn get_nonterminal_rules (&self, nt:&Symbol) -> Result<Vec<Rule>,SymbolTypesError>{
+        let mut rules:Vec<Rule> = vec![];
+        for r in &self.rules {
+            if r.left.liter == nt.liter {
+                rules.push(r.clone());
+            }
+        }
+        if rules.len() > 0 {
+            return Ok(rules);
+        } else {
+            return Err(SymbolTypesError::RightError);
+        }
     }
 
 }
@@ -187,7 +204,7 @@ impl Grammar {
 #[derive(Clone, Debug)]
 pub struct Symbol{
     pub liter: char,
-    pub symbol_type: Type, 
+    pub symbol_type:SymbolType, 
 }
 
 impl Display for Symbol {
@@ -209,14 +226,34 @@ impl From<Symbol> for Vec<Symbol> {
 }
 
 impl Symbol {
-    pub fn new(liter: char, symbol_type: Type) -> Self {
+    pub fn new(liter: char, symbol_type:SymbolType) -> Self {
         Self { liter, symbol_type }
     }
 }
 
+pub fn is_terminal(symbol: &Symbol) -> bool {
+    match symbol.symbol_type {
+        SymbolType::Terminal => true,
+        _ => false,
+    }
+}
+
+pub fn is_nonterminal(symbol: &Symbol) -> bool {
+    match symbol.symbol_type {
+        SymbolType::Nonterminal => true,
+        _ => false,
+    }
+}
+
+pub fn is_empty_line(symbol: &Symbol) -> bool {
+    match symbol.symbol_type {
+        SymbolType::EmptyLine => true,
+        _ => false,
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Type {
+pub enum SymbolType {
     Terminal,
     Nonterminal,
     EmptyLine 
@@ -224,7 +261,7 @@ pub enum Type {
 
 
 #[derive(Debug)]
-pub enum TypesError {
+pub enum SymbolTypesError {
     LeftError,
     RightError,
     NoSymbolError
@@ -273,7 +310,7 @@ impl Chain {
         }
     }
 
-    fn to_string (&self) -> String {
+    pub fn to_string (&self) -> String {
         let mut str = String::new();
         for s in &self.string {
             str += &s.liter.to_string();
@@ -281,14 +318,14 @@ impl Chain {
         return str;
     }
 
-    pub fn get_nonterminal(&self) -> Result<(Symbol, usize), TypesError> {
+    pub fn get_nonterminal(&self) -> Result<(Symbol, usize),SymbolTypesError> {
         for (index, s) in self.string.iter().enumerate() {
-            if let Type::Nonterminal = s.symbol_type {
+            if let SymbolType::Nonterminal = s.symbol_type {
                 return Ok((s.clone(), index));
             }
                 
         }
-        Err(TypesError::NoSymbolError)
+        Err(SymbolTypesError::NoSymbolError)
     }
     
 
@@ -310,8 +347,8 @@ impl From<Chain> for Vec<Chain> {
 
 #[derive(Clone, Debug)]
 pub struct Rule{
-    pub(crate) left: Symbol,
-    pub(crate) right: Chain
+    pub left: Symbol,
+    pub right: Chain
 }
 
 impl Rule {
@@ -329,11 +366,26 @@ impl Rule {
         }
         return new_chain;
     }
+
+    pub fn get_nonterminal(&self) ->  Result<Symbol, SymbolTypesError>{
+        for s in self.right.string.clone() {
+            if s.symbol_type.eq(&SymbolType::Nonterminal) {
+                return Ok(s);
+            }
+        }
+        return Err(SymbolTypesError::NoSymbolError)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ExRule{
+    pub left: Chain,
+    pub right: Chain
 }
 
 #[derive(Clone)]
 pub struct Table{
-    pub(crate) table: Vec<Row>
+    pub table: Vec<State>
 }
 
 impl Default for Table {
@@ -347,8 +399,8 @@ impl Default for Table {
 impl fmt::Debug for Table {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut str = String::new();
-        for r in &self.table {
-            str += &format!("{}", r);
+        for (index, r) in self.table.iter().enumerate() {
+            str += &format!("{}\t{}",index, r);
         }
         writeln!(f, "{}", str)
     }
@@ -357,26 +409,26 @@ impl fmt::Debug for Table {
 impl fmt::Display for Table {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut str = String::new();
-        for r in &self.table {
-            str += &format!("{}", r);
+        for (index, r) in self.table.iter().enumerate() {
+            str += &format!("{}\t{}",index, r);
         }
         writeln!(f, "{}", str)
     }
 }
 
 impl Table {
-    pub fn new(start: Row) -> Self {
+    pub fn new(start: State) -> Self {
         Self { table: Vec::from(start) }
     }
 }
 
 #[derive(Clone)]
-pub struct Row{
+pub struct State{
     pub input_row: Chain,
     pub magazine_state: Chain,
 }
 
-impl Default for Row {
+impl Default for State {
     fn default() -> Self {
         Self {
             input_row: Chain::default(), 
@@ -385,7 +437,7 @@ impl Default for Row {
     }
 }
 
-impl fmt::Debug for Row {
+impl fmt::Debug for State {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
@@ -396,7 +448,7 @@ impl fmt::Debug for Row {
     }
 }
 
-impl Display for Row {
+impl Display for State {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
@@ -407,8 +459,8 @@ impl Display for Row {
     }
 }
 
-impl From<Row> for Vec<Row> {
-    fn from(row: Row) -> Vec<Row> {
+impl From<State> for Vec<State> {
+    fn from(row: State) -> Vec<State> {
         vec![row]
     }
 }
